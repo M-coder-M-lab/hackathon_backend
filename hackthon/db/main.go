@@ -6,221 +6,203 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-
-	"math/rand"
+	"os" // os パッケージをインポート
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/oklog/ulid"
+	"github.com/go-sql-driver/mysql" // MySQLドライバをインポート
+	"github.com/gorilla/mux"
 )
 
-// UserResForHTTPGet はHTTP GETリクエストに対するユーザー情報レスポンスの構造体です。
-type UserResForHTTPGet struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
-	Age  int    `json:"age"`
-}
-
-// UserRequest はHTTP POSTリクエストのペイロードとして期待されるユーザー情報構造体です。
-type UserRequest struct {
-	Name string `json:"name"`
-	Age  int    `json:"age"`
-}
-
-// db はMySQLデータベース接続のためのグローバル変数です。
+// db 変数はグローバルで宣言
 var db *sql.DB
 
-// init 関数はプログラム起動時に自動的に実行され、データベース接続を初期化します。
-func init() {
+// --- 構造体の定義 (変更なし) ---
+type User struct {
+	ID           int       `json:"id"`
+	Username     string    `json:"username"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"password_hash"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type Post struct {
+	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type Reply struct {
+	ID        int       `json:"id"`
+	PostID    int       `json:"post_id"`
+	UserID    int       `json:"user_id"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type Like struct {
+	ID        int       `json:"id"`
+	PostID    int       `json:"post_id"`
+	UserID    int       `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func main() {
+	// --- ここからデータベース接続部分の変更 ---
 	// 環境変数からMySQLの接続情報を取得します。
 	mysqlUser := os.Getenv("MYSQL_USER")
 	mysqlPwd := os.Getenv("MYSQL_PWD")
 	mysqlHost := os.Getenv("MYSQL_HOST")
 	mysqlDatabase := os.Getenv("MYSQL_DATABASE")
 
-	// 接続文字列をフォーマットします。
-	// (例: user:password@tcp(host:port)/database)
-	connStr := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", mysqlUser, mysqlPwd, mysqlHost, mysqlDatabase)
+	// 環境変数が設定されていない場合はエラーを出すか、デフォルト値を設定します。
+	if mysqlUser == "" || mysqlPwd == "" || mysqlHost == "" || mysqlDatabase == "" {
+		log.Fatal("エラー: MySQL接続に必要な環境変数が設定されていません。MYSQL_USER, MYSQL_PWD, MYSQL_HOST, MYSQL_DATABASE を設定してください。")
+	}
 
-	var err error // err変数をここで宣言し、シャドウイングを防ぎます。
-	// MySQLデータベースへの接続を開きます。
+	// 接続文字列の作成
+	// ホスト名にポート番号が含まれている可能性があるため、tcp() の形式で指定するのが一般的です。
+	// 例: MYSQL_HOST="127.0.0.1:3306" の場合、そのまま使用できます。
+	// もしMYSQL_HOSTが "127.0.0.1" のみで、ポートが別に設定されている場合は `host:port` の形式に調整してください。
+	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s", mysqlUser, mysqlPwd, mysqlHost, mysqlDatabase)
+
+	var err error
 	db, err = sql.Open("mysql", connStr)
 	if err != nil {
-		log.Fatalf("データベース接続のオープンに失敗しました: %v\n", err)
+		log.Fatalf("データベース接続エラー: %v", err)
 	}
+	defer db.Close()
 
-	// データベースへの接続をテストします。
-	if err := db.Ping(); err != nil {
-		log.Fatalf("データベースへの接続確認(Ping)に失敗しました: %v\n", err)
+	// データベースへのPINGで接続確認
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("データベースPINGエラー: %v", err)
 	}
+	fmt.Println("MySQLデータベースに正常に接続しました！")
+	// --- データベース接続部分の変更ここまで ---
 
-	log.Println("データベースへの接続に成功しました。")
+	// ルーターの設定 (変更なし)
+	router := mux.NewRouter()
+
+	// CORSミドルウェア (変更なし)
+	router.Use(corsMiddleware)
+
+	// APIエンドポイントの定義 (変更なし)
+	router.HandleFunc("/api/users", createUser).Methods("POST")
+	router.HandleFunc("/api/posts", createPost).Methods("POST")
+	router.HandleFunc("/api/replies", createReply).Methods("POST")
+	router.HandleFunc("/api/likes", createLike).Methods("POST")
+
+	fmt.Println("サーバーをポート8080で起動中...")
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
-// generateULID は新しいULIDを生成して文字列として返します。
-func generateULID() string {
-	t := time.Now()
-	// MonotonicはULIDの後半部分（エントロピー）を生成し、同じミリ秒内の連続する生成に対して単調増加を保証します。
-	// rand.NewSource(t.UnixNano())は乱数ジェネレータのシードを設定します。
-	entropy := ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)
-	return ulid.MustNew(ulid.Timestamp(t), entropy).String()
+// CORSミドルウェア (変更なし)
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000") // Reactのポート
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
-// handler はHTTPリクエストを処理するハンドラ関数です。
-// GETリクエストでは名前でユーザーを検索し、POSTリクエストでは新しいユーザーを登録します。
-func handler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		// GETリクエストの処理
-		// URLクエリパラメータから'name'を取得します。
-		name := r.URL.Query().Get("name")
-		if name == "" {
-			log.Println("エラー: 名前が空です。")
-			http.Error(w, "名前は必須です。", http.StatusBadRequest)
-			return
-		}
-
-		// データベースから指定された名前のユーザーを検索します。
-		rows, err := db.Query("SELECT id, name, age FROM user WHERE name = ?", name)
-		if err != nil {
-			log.Printf("データベースクエリの実行に失敗しました: %v\n", err)
-			http.Error(w, "サーバーエラーが発生しました。", http.StatusInternalServerError)
-			return
-		}
-		// 関数終了時に必ず行セットをクローズします。
-		defer func() {
-			if err := rows.Close(); err != nil {
-				log.Printf("行セットのクローズに失敗しました: %v\n", err)
-				// ここではエラーをログに記録するだけですが、より堅牢なシステムでは追加の処理が必要かもしれません。
-			}
-		}()
-
-		// 取得したユーザー情報を格納するためのスライスを初期化します。
-		users := make([]UserResForHTTPGet, 0)
-		// 行セットを繰り返し処理し、各ユーザー情報をスキャンします。
-		for rows.Next() {
-			var u UserResForHTTPGet
-			if err := rows.Scan(&u.Id, &u.Name, &u.Age); err != nil {
-				log.Printf("行データのスキャンに失敗しました: %v\n", err)
-				http.Error(w, "サーバーエラーが発生しました。", http.StatusInternalServerError)
-				return
-			}
-			users = append(users, u)
-		}
-
-		// ユーザー情報をJSON形式にシリアライズします。
-		bytes, err := json.Marshal(users)
-		if err != nil {
-			log.Printf("JSONのエンコードに失敗しました: %v\n", err)
-			http.Error(w, "サーバーエラーが発生しました。", http.StatusInternalServerError)
-			return
-		}
-		// レスポンスヘッダにContent-Typeを設定し、JSONを書き込みます。
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(bytes)
-
-	case http.MethodPost:
-		// POSTリクエストの処理
-		var userReq UserRequest
-		// リクエストボディからJSONをパースします。
-		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&userReq); err != nil {
-			log.Printf("リクエストボディのJSONデコードに失敗しました: %v\n", err)
-			http.Error(w, "不正なリクエストボディです。", http.StatusBadRequest)
-			return
-		}
-
-		// 入力値のバリデーションを行います。
-		if userReq.Name == "" || len(userReq.Name) > 50 {
-			log.Println("エラー: 名前の形式が不正です。")
-			http.Error(w, "名前は必須で、50文字以内である必要があります。", http.StatusBadRequest)
-			return
-		}
-		if userReq.Age < 20 || userReq.Age > 80 {
-			log.Println("エラー: 年齢の範囲が不正です。")
-			http.Error(w, "年齢は20歳から80歳の範囲である必要があります。", http.StatusBadRequest)
-			return
-		}
-
-		// トランザクションを開始します。
-		tx, err := db.Begin()
-		if err != nil {
-			log.Printf("トランザクションの開始に失敗しました: %v\n", err)
-			http.Error(w, "サーバーエラーが発生しました。", http.StatusInternalServerError)
-			return
-		}
-
-		// 新しいULIDを生成し、ユーザー情報をデータベースに挿入します。
-		id := generateULID()
-		_, err = tx.Exec("INSERT INTO user (id, name, age) VALUES (?, ?, ?)", id, userReq.Name, userReq.Age)
-		if err != nil {
-			tx.Rollback() // エラーが発生した場合はロールバックします。
-			log.Printf("ユーザーの挿入に失敗しました: %v\n", err)
-			http.Error(w, "サーバーエラーが発生しました。", http.StatusInternalServerError)
-			return
-		}
-
-		// トランザクションをコミットします。
-		if err := tx.Commit(); err != nil {
-			log.Printf("トランザクションのコミットに失敗しました: %v\n", err)
-			http.Error(w, "サーバーエラーが発生しました。", http.StatusInternalServerError)
-			return
-		}
-
-		// 成功レスポンスをJSON形式で返します。
-		response := map[string]string{
-			"id": id,
-		}
-		bytes, err := json.Marshal(response)
-		if err != nil {
-			log.Printf("JSONのエンコードに失敗しました: %v\n", err)
-			http.Error(w, "サーバーエラーが発生しました。", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK) // ステータスコード200 OK
-		w.Write(bytes)
-
-	default:
-		// サポートされていないHTTPメソッドに対する処理
-		log.Printf("エラー: サポートされていないHTTPメソッドです: %s\n", r.Method)
-		http.Error(w, "サポートされていないHTTPメソッドです。", http.StatusMethodNotAllowed)
+// APIハンドラ関数群 (変更なし)
+func createUser(w http.ResponseWriter, r *http.Request) {
+	var user User
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-}
-
-// main 関数はプログラムのエントリーポイントです。
-func main() {
-	// "/user"パスに対するハンドラを設定します。
-	http.HandleFunc("/user", handler)
-
-	// Ctrl+C (SIGTERM, SIGINT) シグナルでDB接続をクローズする処理を設定します。
-	closeDBWithSysCall()
-
-	// 8000番ポートでHTTPサーバーを起動し、リクエストを待ち受けます。
-	log.Println("HTTPサーバーをポート8000で起動中...")
-	if err := http.ListenAndServe(":8000", nil); err != nil {
-		log.Fatalf("HTTPサーバーの起動に失敗しました: %v\n", err)
+	result, err := db.Exec("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+		user.Username, user.Email, user.PasswordHash)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	id, _ := result.LastInsertId()
+	user.ID = int(id)
+	user.CreatedAt = time.Now()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+	fmt.Printf("ユーザーを作成しました: %s\n", user.Username)
 }
 
-// closeDBWithSysCall は、システムコール（SIGTERM, SIGINT）を受信した際に
-// データベース接続をクローズするためのゴルーチンを開始します。
-func closeDBWithSysCall() {
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT) // SIGTERMとSIGINTを監視します。
-	go func() {
-		s := <-sig // シグナルを受信するまでブロックします。
-		log.Printf("システムコールを受信しました: %v", s)
+func createPost(w http.ResponseWriter, r *http.Request) {
+	var post Post
+	err := json.NewDecoder(r.Body).Decode(&post)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	result, err := db.Exec("INSERT INTO posts (user_id, content) VALUES (?, ?)",
+		post.UserID, post.Content)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	id, _ := result.LastInsertId()
+	post.ID = int(id)
+	post.CreatedAt = time.Now()
+	post.UpdatedAt = time.Now()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(post)
+	fmt.Printf("投稿を作成しました (UserID: %d): %s\n", post.UserID, post.Content)
+}
 
-		// データベース接続をクローズします。
-		if err := db.Close(); err != nil {
-			log.Fatalf("データベースのクローズに失敗しました: %v\n", err)
+func createReply(w http.ResponseWriter, r *http.Request) {
+	var reply Reply
+	err := json.NewDecoder(r.Body).Decode(&reply)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	result, err := db.Exec("INSERT INTO replies (post_id, user_id, content) VALUES (?, ?, ?)",
+		reply.PostID, reply.UserID, reply.Content)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	id, _ := result.LastInsertId()
+	reply.ID = int(id)
+	reply.CreatedAt = time.Now()
+	reply.UpdatedAt = time.Now()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(reply)
+	fmt.Printf("返信を作成しました (PostID: %d, UserID: %d): %s\n", reply.PostID, reply.UserID, reply.Content)
+}
+
+func createLike(w http.ResponseWriter, r *http.Request) {
+	var like Like
+	err := json.NewDecoder(r.Body).Decode(&like)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	result, err := db.Exec("INSERT INTO likes (post_id, user_id) VALUES (?, ?)",
+		like.PostID, like.UserID)
+	if err != nil {
+		mysqlErr, ok := err.(*mysql.MySQLError)
+		if ok && mysqlErr.Number == 1062 {
+			http.Error(w, "既にこの投稿に「いいね」しています。", http.StatusConflict)
+			return
 		}
-		log.Printf("データベースのクローズに成功しました。プログラムを終了します。")
-		os.Exit(0) // プログラムを正常終了します。
-	}()
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	id, _ := result.LastInsertId()
+	like.ID = int(id)
+	like.CreatedAt = time.Now()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(like)
+	fmt.Printf("「いいね」を作成しました (PostID: %d, UserID: %d)\n", like.PostID, like.UserID)
 }
