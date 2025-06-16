@@ -6,12 +6,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-# CGO_ENABLED=0 is important for truly static binaries with scratch or distroless
-# If your app needs CGO, you'd link it dynamically which distroless/static helps with
+# Ensure CGO_ENABLED=0 for a fully static binary suitable for distroless/static
 RUN CGO_ENABLED=0 go build -o /app/main .
 
 # ランタイム
-FROM gcr.io/distroless/static
+FROM gcr.io/distroless/static # <-- CHANGE THIS LINE
 WORKDIR /app
 COPY --from=builder /app/main .
 
