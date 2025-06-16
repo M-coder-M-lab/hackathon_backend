@@ -1,5 +1,5 @@
 # ビルドステージ: Goアプリケーションをビルド
-FROM golang:1.24-alpine AS builder
+FROM golang:1.24-alpine AS builder  # <--- THIS LINE NEEDS TO BE CHANGED TO 1.24 OR HIGHER
 
 WORKDIR /app
 
