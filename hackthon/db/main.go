@@ -8,8 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
-	"os" // os パッケージをインポート
+	"net/http" // os パッケージをインポート
 	"time"
 
 	"github.com/go-sql-driver/mysql" // MySQLドライバをインポート
@@ -67,25 +66,29 @@ func registerTLSConfig() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	mysql.RegisterTLSConfig("custom", &tls.Config{
-		RootCAs:      rootCertPool,
-		Certificates: []tls.Certificate{certs},
+	log.Println("クライアント証明書と秘密鍵を読み込みました")
+	err = mysql.RegisterTLSConfig("custom", &tls.Config{
+		RootCAs:            rootCertPool,
+		Certificates:       []tls.Certificate{certs},
+		InsecureSkipVerify: true,
 	})
+	if err != nil {
+		log.Fatalf("TLS設定登録失敗: %v", err)
+	}
 }
 
 func main() {
 	// --- ここからデータベース接続部分の変更 ---
 	// 環境変数からMySQLの接続情報を取得します。
-	mysqlUser := os.Getenv("MYSQL_USER")
-	mysqlPwd := os.Getenv("MYSQL_PWD")
-	mysqlHost := os.Getenv("MYSQL_HOST")
-	mysqlDatabase := os.Getenv("MYSQL_DATABASE")
+	//mysqlUser := os.Getenv("MYSQL_USER")
+	//mysqlPwd := os.Getenv("MYSQL_PWD")
+	//mysqlHost := os.Getenv("MYSQL_HOST")
+	// mysqlDatabase := os.Getenv("MYSQL_DATABASE")
 
-	// 環境変数が設定されていない場合はエラーを出すか、デフォルト値を設定します。
-	if mysqlUser == "" || mysqlPwd == "" || mysqlHost == "" || mysqlDatabase == "" {
-		log.Fatal("エラー: MySQL接続に必要な環境変数が設定されていません。MYSQL_USER, MYSQL_PWD, MYSQL_HOST, MYSQL_DATABASE を設定してください。")
-	}
+	// // 環境変数が設定されていない場合はエラーを出すか、デフォルト値を設定します。
+	// if mysqlUser == "" || mysqlPwd == "" || mysqlHost == "" || mysqlDatabase == "" {
+	// 	log.Fatal("エラー: MySQL接続に必要な環境変数が設定されていません。MYSQL_USER, MYSQL_PWD, MYSQL_HOST, MYSQL_DATABASE を設定してください。")
+	// }
 	registerTLSConfig()
 
 	connStr := fmt.Sprintf("root:19b-apFqu4APTx4A@tcp(34.67.141.68:3306)/hackathon?tls=custom")
