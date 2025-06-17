@@ -88,7 +88,7 @@ func main() {
 	}
 	registerTLSConfig()
 
-	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?tls=custom", uttc, 19b-apFqu4APTx4A, unix(/cloudsql/term7-yuuki-nakashima:us-central1:uttc), hackathon)
+	connStr := fmt.Sprintf("root:19b-apFqu4APTx4A@tcp(34.67.141.68:3306)/hackathon?tls=custom")
 
 	// 接続文字列の作成
 	// ホスト名にポート番号が含まれている可能性があるため、tcp() の形式で指定するのが一般的です。
