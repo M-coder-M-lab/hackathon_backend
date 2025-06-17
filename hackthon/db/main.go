@@ -119,7 +119,7 @@ func main() {
 	router.Use(corsMiddleware)
 
 	// APIエンドポイントの定義 (変更なし)
-	router.HandleFunc("/api/users", createUser).Methods("POST")
+	router.HandleFunc("/api/users", createUser).Methods("GET")
 	router.HandleFunc("/api/posts", createPost).Methods("POST")
 	router.HandleFunc("/api/replies", createReply).Methods("POST")
 	router.HandleFunc("/api/likes", createLike).Methods("POST")
