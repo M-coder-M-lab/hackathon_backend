@@ -16,3 +16,5 @@ COPY --from=builder /app/main .
 USER nonroot
 EXPOSE 8080
 CMD ["/app/main"]
+
+COPY ./server-ca.pem ./client-cert.pem ./client-key.pem ./
