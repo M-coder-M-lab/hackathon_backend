@@ -54,7 +54,7 @@ type Like struct {
 
 func registerTLSConfig() {
 	rootCertPool := x509.NewCertPool()
-	pem, err := ioutil.ReadFile("ca.pem")
+	pem, err := ioutil.ReadFile("server-ca.pem")
 	if err != nil {
 		log.Fatal(err)
 	}
