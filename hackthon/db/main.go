@@ -124,16 +124,8 @@ func main() {
 	router.HandleFunc("/api/replies", createReply).Methods("POST")
 	router.HandleFunc("/api/likes", createLike).Methods("POST")
 	//port := os.Getenv("PORT"); if port == "" { port = "8080" }
-	//fmt.Println("サーバーをポート8080で起動中...")
-	//log.Fatal(http.ListenAndServe(":8080", router))
-	if port == "" {
-		port = "8080" // デフォルトとして8080を設定
-	}
-
-	// 0.0.0.0 (すべてのネットワークインターフェース) で指定されたポートをリッスン
-	addr := fmt.Sprintf(":%s", port)
-	fmt.Printf("サーバーをポート%sで起動中 (アドレス: %s)...\n", port, addr)
-	log.Fatal(http.ListenAndServe(addr, router))
+	fmt.Println("サーバーをポート8080で起動中...")
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
 // CORSミドルウェア (変更なし)
