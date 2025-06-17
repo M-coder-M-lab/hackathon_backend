@@ -10,7 +10,8 @@ COPY . .
 RUN CGO_ENABLED=0 go build -o main .
 
 # Final stage (distroless)
-FROM gcr.io/distroless/static # <-- ここを変更
+FROM 
+RUN ls -l /app/main # <-- ここを変更
 WORKDIR /app
 COPY --from=builder /app/main .
 
