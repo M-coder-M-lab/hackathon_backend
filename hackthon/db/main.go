@@ -61,7 +61,7 @@ func registerTLSConfig() {
 	if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
 		log.Fatal("CA証明書を追加できませんでした")
 	}
-
+	
 	certs, err := tls.LoadX509KeyPair("client-cert.pem", "client-key.pem")
 	if err != nil {
 		log.Fatal(err)
@@ -123,9 +123,9 @@ func main() {
 	router.HandleFunc("/api/posts", createPost).Methods("POST")
 	router.HandleFunc("/api/replies", createReply).Methods("POST")
 	router.HandleFunc("/api/likes", createLike).Methods("POST")
-
-	fmt.Println("サーバーをポート8080で起動中...")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	port := os.Getenv("PORT"); if port == "" { port = "8080" }
+	//fmt.Println("サーバーをポート8080で起動中...")
+	//log.Fatal(http.ListenAndServe(":8080", router))
 }
 
 // CORSミドルウェア (変更なし)
