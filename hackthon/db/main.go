@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os" // os パッケージをインポート
@@ -49,6 +52,28 @@ type Like struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+func registerTLSConfig() {
+	rootCertPool := x509.NewCertPool()
+	pem, err := ioutil.ReadFile("ca.pem")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
+		log.Fatal("CA証明書を追加できませんでした")
+	}
+
+	certs, err := tls.LoadX509KeyPair("client-cert.pem", "client-key.pem")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mysql.RegisterTLSConfig("custom", &tls.Config{
+		RootCAs:      rootCertPool,
+		Certificates: []tls.Certificate{certs},
+	})
+}
+
 func main() {
 	// --- ここからデータベース接続部分の変更 ---
 	// 環境変数からMySQLの接続情報を取得します。
@@ -61,13 +86,14 @@ func main() {
 	if mysqlUser == "" || mysqlPwd == "" || mysqlHost == "" || mysqlDatabase == "" {
 		log.Fatal("エラー: MySQL接続に必要な環境変数が設定されていません。MYSQL_USER, MYSQL_PWD, MYSQL_HOST, MYSQL_DATABASE を設定してください。")
 	}
+	registerTLSConfig()
+
+	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?tls=custom", mysqlUser, mysqlPwd, mysqlHost, mysqlDatabase)
 
 	// 接続文字列の作成
 	// ホスト名にポート番号が含まれている可能性があるため、tcp() の形式で指定するのが一般的です。
 	// 例: MYSQL_HOST="127.0.0.1:3306" の場合、そのまま使用できます。
 	// もしMYSQL_HOSTが "127.0.0.1" のみで、ポートが別に設定されている場合は `host:port` の形式に調整してください。
-	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s", mysqlUser, mysqlPwd, mysqlHost, mysqlDatabase)
-
 	var err error
 	db, err = sql.Open("mysql", connStr)
 	if err != nil {
