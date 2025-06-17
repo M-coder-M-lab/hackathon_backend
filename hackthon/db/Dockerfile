@@ -1,4 +1,4 @@
-# ビルドステージ
+# Build stage
 FROM golang:1.24 AS builder
 WORKDIR /app
 
@@ -6,12 +6,12 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go build -o main .   # ← 注意：ここで「main」バイナリが本当に生成されるか
+RUN go build -o main .  # 相対パスでOK（出力は /app/main）
 
-# ランタイムステージ
+# Final stage
 FROM scratch
 WORKDIR /app
-COPY --from=builder /app/main .   # ← このファイルが builder に存在している必要がある
+#COPY --from=builder /app/main .
 
 EXPOSE 8080
 CMD ["/app/main"]
