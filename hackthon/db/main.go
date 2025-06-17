@@ -126,7 +126,6 @@ func main() {
 	//port := os.Getenv("PORT"); if port == "" { port = "8080" }
 	//fmt.Println("サーバーをポート8080で起動中...")
 	//log.Fatal(http.ListenAndServe(":8080", router))
-		port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080" // デフォルトとして8080を設定
 	}
