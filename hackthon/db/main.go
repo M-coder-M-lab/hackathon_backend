@@ -98,12 +98,10 @@ func main() {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-
-		if origin == "https://hackathon-xj55.vercel.app" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-		}
+		// Allow all origins (for development, not recommended for production)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// If you use "*", you cannot use Access-Control-Allow-Credentials: "true"
+		// w.Header().Set("Access-Control-Allow-Credentials", "true") // Remove or comment out this line if using "*"
 
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
@@ -117,7 +115,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
