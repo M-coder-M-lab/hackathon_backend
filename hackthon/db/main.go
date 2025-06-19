@@ -94,26 +94,33 @@ func main() {
 
 	log.Println("サーバー起動中 :8080")
 	http.ListenAndServe(":8080", router)
+	router.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.WriteHeader(http.StatusOK)
+})
+	router.HandleFunc("/api/login", loginHandler).Methods("POST")
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//func corsMiddleware(next http.Handler) http.Handler {
+	//return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// すべてのオリジンを許可する（開発向け、本番環境では非推奨）
-		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
+		//w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
 		// "*" を使用する場合、Access-Control-Allow-Credentials: "true" は使用できません
 		// w.Header().Set("Access-Control-Allow-Credentials", "true") // この行は削除またはコメントアウトしてください
 
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		//w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		//w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		// Preflightリクエストへの即時レスポンス
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
+		//if r.Method == "OPTIONS" {
+			//w.WriteHeader(http.StatusOK)
+			//return
+		//}
 
-		next.ServeHTTP(w, r)
-	})
-}
+		//next.ServeHTTP(w, r)
+	//})
+//}
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
