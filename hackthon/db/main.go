@@ -187,19 +187,70 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 	var posts []Post
 	for rows.Next() {
 		var p Post
-		rows.Scan(&p.ID, &p.UserID, &p.Content, &p.CreatedAt, &p.UpdatedAt)
-		db.QueryRow("SELECT COUNT(*) FROM likes WHERE post_id = ?", p.ID).Scan(&p.Likes)
-		rpRows, _ := db.Query("SELECT id, post_id, user_id, content, created_at, updated_at FROM replies WHERE post_id = ?", p.ID)
-		for rpRows.Next() {
-			var r Reply
-			rpRows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.CreatedAt, &r.UpdatedAt)
-			p.Replies = append(p.Replies, r)
+		err := rows.Scan(&p.ID, &p.UserID, &p.Content, &p.CreatedAt, &p.UpdatedAt)
+		if err != nil {
+			log.Printf("投稿読み取りエラー: %v", err)
+			continue
 		}
-		rpRows.Close()
+
+		// ★★ Replies を空スライスで初期化（← これが重要）
+		p.Replies = []Reply{}
+
+		// いいね数を取得
+		err = db.QueryRow("SELECT COUNT(*) FROM likes WHERE post_id = ?", p.ID).Scan(&p.Likes)
+		if err != nil {
+			log.Printf("いいね数読み取りエラー: %v", err)
+		}
+
+		// リプライを取得
+		rpRows, err := db.Query("SELECT id, post_id, user_id, content, created_at, updated_at FROM replies WHERE post_id = ?", p.ID)
+		if err != nil {
+			log.Printf("リプライ取得エラー: %v", err)
+		} else {
+			for rpRows.Next() {
+				var r Reply
+				err := rpRows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.CreatedAt, &r.UpdatedAt)
+				if err != nil {
+					log.Printf("リプライ読み取りエラー: %v", err)
+					continue
+				}
+				p.Replies = append(p.Replies, r)
+			}
+			rpRows.Close()
+		}
+
 		posts = append(posts, p)
 	}
+
+	// JSONで返す
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(posts)
 }
+
+// func getPosts(w http.ResponseWriter, r *http.Request) {
+// 	rows, err := db.Query("SELECT id, user_id, content, created_at, updated_at FROM posts ORDER BY created_at DESC")
+// 	if err != nil {
+// 		http.Error(w, "投稿取得失敗", http.StatusInternalServerError)
+// 		return
+// 	}
+// 	defer rows.Close()
+
+// 	var posts []Post
+// 	for rows.Next() {
+// 		var p Post
+// 		rows.Scan(&p.ID, &p.UserID, &p.Content, &p.CreatedAt, &p.UpdatedAt)
+// 		db.QueryRow("SELECT COUNT(*) FROM likes WHERE post_id = ?", p.ID).Scan(&p.Likes)
+// 		rpRows, _ := db.Query("SELECT id, post_id, user_id, content, created_at, updated_at FROM replies WHERE post_id = ?", p.ID)
+// 		for rpRows.Next() {
+// 			var r Reply
+// 			rpRows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.CreatedAt, &r.UpdatedAt)
+// 			p.Replies = append(p.Replies, r)
+// 		}
+// 		rpRows.Close()
+// 		posts = append(posts, p)
+// 	}
+// 	json.NewEncoder(w).Encode(posts)
+// }
 
 // func createPost(w http.ResponseWriter, r *http.Request) {
 // 	var post Post
