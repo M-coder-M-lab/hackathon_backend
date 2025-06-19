@@ -44,7 +44,7 @@ function App() {
   };
 
   const createPost = async () => {
-    await fetch('http://localhost:8080/posts/create', {
+    await fetch('${API_URL}/posts/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: user.uid, content: newPostContent }),
@@ -54,7 +54,7 @@ function App() {
   };
 
   const likePost = async (postID) => {
-    await fetch('http://localhost:8080/posts/like', {
+    await fetch('${API_URL}/posts/like', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: user.uid, post_id: postID }),
@@ -63,7 +63,7 @@ function App() {
   };
 
   const sendReply = async (postID) => {
-    await fetch('http://localhost:8080/posts/reply', {
+    await fetch('${API_URL}/posts/reply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -77,7 +77,7 @@ function App() {
   };
 
   const reloadPosts = () => {
-    fetch('http://localhost:8080/posts')
+    fetch('${API_URL}/posts')
       .then((res) => res.json())
       .then((data) => setPosts(data));
   };
