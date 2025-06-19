@@ -1,205 +1,159 @@
-import React, { useState } from 'react';
-import './App.css'; // 必要に応じてCSSを記述
+import React, { useEffect, useState } from 'react';
+import './App.css';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { initializeApp } from 'firebase/app';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBQ4L3nC0GJtsy1SllH4x3I5yInEfpMyc0",
+  authDomain: "hackathon-b05e3.firebaseapp.com",
+  projectId: "hackathon-b05e3",
+  storageBucket: "hackathon-b05e3.firebasestorage.app",
+  messagingSenderId: "293078170583",
+  appId: "1:293078170583:web:21275a789ba589f5d62992",
+  measurementId: "G-7GCR8BHD46"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+const API_URL = 'http://localhost:8080/api';
 
 function App() {
-  const API_BASE_URL = 'http://localhost:8080/api'; // GoバックエンドのURL
-
-  // フォームの状態管理
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [passwordHash, setPasswordHash] = useState('');
-
-  const [postUserId, setPostUserId] = useState('');
+  const [user, setUser] = useState(null);
+  const [posts, setPosts] = useState([]);
   const [postContent, setPostContent] = useState('');
+  const [replyContent, setReplyContent] = useState({});
+  const [summary, setSummary] = useState({});
 
-  const [replyPostId, setReplyPostId] = useState('');
-  const [replyUserId, setReplyUserId] = useState('');
-  const [replyContent, setReplyContent] = useState('');
+  useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    if (storedUser) {
+      setUser(storedUser);
+      fetchPosts();
+    }
+  }, []);
 
-  const [likePostId, setLikePostId] = useState('');
-  const [likeUserId, setLikeUserId] = useState('');
-
-  const [responseMessage, setResponseMessage] = useState(''); // APIからのレスポンスメッセージ
-
-  const sendRequest = async (url, method, body) => {
+  const handleLogin = async () => {
+    const email = prompt('メールアドレスを入力');
+    const password = prompt('パスワードを入力');
     try {
-      const res = await fetch(url, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': 'http://localhost:3000', // バックエンドのCORS設定と合わせる
-          'Access-Control-Allow-Credentials': 'true',
-        },
-        body: JSON.stringify(body),
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const { uid, displayName } = result.user;
+      const username = displayName || email;
+
+      const res = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid, email, username })
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`APIエラー: ${res.status} ${res.statusText} - ${errorText}`);
-      }
-
       const data = await res.json();
-      setResponseMessage(`成功: ${JSON.stringify(data, null, 2)}`);
+      const newUser = { id: data.user_id, uid, email, username };
+      setUser(newUser);
+      localStorage.setItem('user', JSON.stringify(newUser));
+      fetchPosts();
     } catch (error) {
-      setResponseMessage(`エラー: ${error.message}`);
-      console.error('APIリクエストエラー:', error);
+      console.error('ログイン失敗:', error);
+      alert('ログインに失敗しました。');
     }
   };
 
-  // --- ユーザー作成ハンドラ ---
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    await sendRequest(`${API_BASE_URL}/users`, 'POST', {
-      username,
-      email,
-      password_hash: passwordHash,
-    });
-    setUsername('');
-    setEmail('');
-    setPasswordHash('');
+  const handleRegister = async () => {
+    const email = prompt('登録するメールアドレスを入力');
+    const password = prompt('登録するパスワードを入力');
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      const { uid } = result.user;
+      const username = email;
+
+      const res = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid, email, username })
+      });
+      const data = await res.json();
+      const newUser = { id: data.user_id, uid, email, username };
+      setUser(newUser);
+      localStorage.setItem('user', JSON.stringify(newUser));
+      fetchPosts();
+    } catch (error) {
+      console.error('ユーザー登録失敗:', error);
+      alert('ユーザー登録に失敗しました。');
+    }
   };
 
-  // --- 投稿作成ハンドラ ---
-  const handleCreatePost = async (e) => {
-    e.preventDefault();
-    await sendRequest(`${API_BASE_URL}/posts`, 'POST', {
-      user_id: parseInt(postUserId, 10),
-      content: postContent,
+  const fetchPosts = async () => {
+    const res = await fetch(`${API_URL}/posts`);
+    const data = await res.json();
+    setPosts(data);
+  };
+
+  const handlePost = async () => {
+    await fetch(`${API_URL}/posts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id, content: postContent })
     });
-    setPostUserId('');
     setPostContent('');
+    fetchPosts();
   };
 
-  // --- 返信作成ハンドラ ---
-  const handleCreateReply = async (e) => {
-    e.preventDefault();
-    await sendRequest(`${API_BASE_URL}/replies`, 'POST', {
-      post_id: parseInt(replyPostId, 10),
-      user_id: parseInt(replyUserId, 10),
-      content: replyContent,
+  const handleReply = async (postId) => {
+    await fetch(`${API_URL}/replies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ post_id: postId, user_id: user.id, content: replyContent[postId] })
     });
-    setReplyPostId('');
-    setReplyUserId('');
-    setReplyContent('');
+    setReplyContent((prev) => ({ ...prev, [postId]: '' }));
+    fetchPosts();
   };
 
-  // --- いいね作成ハンドラ ---
-  const handleCreateLike = async (e) => {
-    e.preventDefault();
-    await sendRequest(`${API_BASE_URL}/likes`, 'POST', {
-      post_id: parseInt(likePostId, 10),
-      user_id: parseInt(likeUserId, 10),
-    });
-    setLikePostId('');
-    setLikeUserId('');
+  const handleSummary = async (postId) => {
+    const res = await fetch(`${API_URL}/summary/${postId}`);
+    const data = await res.json();
+    setSummary((prev) => ({ ...prev, [postId]: data.summary }));
   };
+
+  if (!user) return (
+    <div>
+      <button onClick={handleLogin}>メールアドレスでログイン</button>
+      <button onClick={handleRegister}>新規ユーザー登録</button>
+    </div>
+  );
 
   return (
     <div className="App">
-      <h1>Go Backend & React Frontend Example</h1>
-
-      <div className="form-section">
-        <h2>ユーザーを作成</h2>
-        <form onSubmit={handleCreateUser}>
-          <input
-            type="text"
-            placeholder="ユーザー名"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-          <input
-            type="email"
-            placeholder="メールアドレス"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="パスワードハッシュ"
-            value={passwordHash}
-            onChange={(e) => setPasswordHash(e.target.value)}
-            required
-          />
-          <button type="submit">ユーザー作成</button>
-        </form>
+      <h1>ようこそ, {user.username}さん</h1>
+      <div>
+        <textarea
+          value={postContent}
+          onChange={(e) => setPostContent(e.target.value)}
+          placeholder="新しい投稿..."
+        ></textarea>
+        <button onClick={handlePost}>投稿</button>
       </div>
 
-      <div className="form-section">
-        <h2>投稿を作成</h2>
-        <form onSubmit={handleCreatePost}>
-          <input
-            type="number"
-            placeholder="ユーザーID"
-            value={postUserId}
-            onChange={(e) => setPostUserId(e.target.value)}
-            required
-          />
-          <textarea
-            placeholder="投稿内容"
-            value={postContent}
-            onChange={(e) => setPostContent(e.target.value)}
-            required
-          ></textarea>
-          <button type="submit">投稿作成</button>
-        </form>
+      <div>
+        {posts.map((post) => (
+          <div key={post.id} style={{ border: '1px solid #ccc', margin: '10px', padding: '10px' }}>
+            <p>{post.content}</p>
+            <p>いいね: {post.likes}</p>
+            <div>
+              <strong>リプライ:</strong>
+              {post.replies.map((reply) => (
+                <p key={reply.id} style={{ marginLeft: '1em' }}>- {reply.content}</p>
+              ))}
+            </div>
+            <textarea
+              value={replyContent[post.id] || ''}
+              onChange={(e) => setReplyContent({ ...replyContent, [post.id]: e.target.value })}
+              placeholder="リプライ..."
+            ></textarea>
+            <button onClick={() => handleReply(post.id)}>リプライ送信</button>
+            <button onClick={() => handleSummary(post.id)}>要約取得</button>
+            {summary[post.id] && <p><strong>要約:</strong> {summary[post.id]}</p>}
+          </div>
+        ))}
       </div>
-
-      <div className="form-section">
-        <h2>返信を作成</h2>
-        <form onSubmit={handleCreateReply}>
-          <input
-            type="number"
-            placeholder="投稿ID"
-            value={replyPostId}
-            onChange={(e) => setReplyPostId(e.target.value)}
-            required
-          />
-          <input
-            type="number"
-            placeholder="ユーザーID"
-            value={replyUserId}
-            onChange={(e) => setReplyUserId(e.target.value)}
-            required
-          />
-          <textarea
-            placeholder="返信内容"
-            value={replyContent}
-            onChange={(e) => setReplyContent(e.target.value)}
-            required
-          ></textarea>
-          <button type="submit">返信作成</button>
-        </form>
-      </div>
-
-      <div className="form-section">
-        <h2>「いいね」を作成</h2>
-        <form onSubmit={handleCreateLike}>
-          <input
-            type="number"
-            placeholder="投稿ID"
-            value={likePostId}
-            onChange={(e) => setLikePostId(e.target.value)}
-            required
-          />
-          <input
-            type="number"
-            placeholder="ユーザーID"
-            value={likeUserId}
-            onChange={(e) => setLikeUserId(e.target.value)}
-            required
-          />
-          <button type="submit">「いいね」作成</button>
-        </form>
-      </div>
-
-      {responseMessage && (
-        <div className="response-message">
-          <h3>APIレスポンス:</h3>
-          <pre>{responseMessage}</pre>
-        </div>
-      )}
     </div>
   );
 }
