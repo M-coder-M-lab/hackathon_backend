@@ -8,101 +8,89 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http" // os パッケージをインポート
-	"time"
+	"net/http"
+	"os" // osパッケージをインポート
 
 	"github.com/go-sql-driver/mysql" // MySQLドライバをインポート
-	"github.com/gorilla/mux"
+	"github.com/rs/cors"             // CORSミドルウェア
 )
 
-// db 変数はグローバルで宣言
+// Post represents a social media post.
+type Post struct {
+	ID        int     `json:"id"`
+	UserID    int     `json:"user_id"`
+	Content   string  `json:"content"`
+	Likes     int     `json:"likes"`
+	Replies   []Reply `json:"replies"`
+	CreatedAt string  `json:"created_at"`
+}
+
+// Reply represents a reply to a post.
+type Reply struct {
+	ID        int    `json:"id"`
+	PostID    int    `json:"post_id"`
+	UserID    int    `json:"user_id"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"created_at"`
+}
+
 var db *sql.DB
 
-// --- 構造体の定義 (変更なし) ---
-type User struct {
-	ID           int       `json:"id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"password_hash"`
-	CreatedAt    time.Time `json:"created_at"`
-}
-
-type Post struct {
-	ID        int       `json:"id"`
-	UserID    int       `json:"user_id"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type Reply struct {
-	ID        int       `json:"id"`
-	PostID    int       `json:"post_id"`
-	UserID    int       `json:"user_id"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type Like struct {
-	ID        int       `json:"id"`
-	PostID    int       `json:"post_id"`
-	UserID    int       `json:"user_id"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
+// registerTLSConfig sets up the TLS configuration for the MySQL connection.
 func registerTLSConfig() {
 	rootCertPool := x509.NewCertPool()
 	pem, err := ioutil.ReadFile("/app/server-ca.pem")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("CA証明書の読み込み失敗: %v", err)
 	}
 
 	if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
 		log.Fatal("CA証明書を追加できませんでした")
 	}
-	
+
 	certs, err := tls.LoadX509KeyPair("client-cert.pem", "client-key.pem")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("クライアント証明書と秘密鍵の読み込み失敗: %v", err)
 	}
 	log.Println("クライアント証明書と秘密鍵を読み込みました")
+
 	err = mysql.RegisterTLSConfig("custom", &tls.Config{
 		RootCAs:            rootCertPool,
 		Certificates:       []tls.Certificate{certs},
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, // This should be false in production if you have proper host verification
 	})
 	if err != nil {
 		log.Fatalf("TLS設定登録失敗: %v", err)
 	}
 }
 
-func main() {
-	// --- ここからデータベース接続部分の変更 ---
-	// 環境変数からMySQLの接続情報を取得します。
-	//mysqlUser := os.Getenv("MYSQL_USER")
-	//mysqlPwd := os.Getenv("MYSQL_PWD")
-	//mysqlHost := os.Getenv("MYSQL_HOST")
-	// mysqlDatabase := os.Getenv("MYSQL_DATABASE")
+// initDB initializes the database connection using environment variables and TLS.
+func initDB() {
+	registerTLSConfig() // TLS設定を最初に登録
 
-	// // 環境変数が設定されていない場合はエラーを出すか、デフォルト値を設定します。
-	// if mysqlUser == "" || mysqlPwd == "" || mysqlHost == "" || mysqlDatabase == "" {
-	// 	log.Fatal("エラー: MySQL接続に必要な環境変数が設定されていません。MYSQL_USER, MYSQL_PWD, MYSQL_HOST, MYSQL_DATABASE を設定してください。")
-	// }
-	registerTLSConfig()
+	mysqlUser := os.Getenv("MYSQL_USER")
+	mysqlPwd := os.Getenv("MYSQL_PWD")
+	mysqlHost := os.Getenv("MYSQL_HOST")
+	mysqlDatabase := os.Getenv("MYSQL_DATABASE")
 
-	connStr := fmt.Sprintf("uttc:19b-apFqu4APTx4A@tcp(34.67.141.68:3306)/hackathon?tls=custom")
+	if mysqlUser == "" || mysqlPwd == "" || mysqlHost == "" || mysqlDatabase == "" {
+		log.Fatal("エラー: MySQL接続に必要な環境変数が設定されていません。MYSQL_USER, MYSQL_PWD, MYSQL_HOST, MYSQL_DATABASE を設定してください。")
+	}
 
 	// 接続文字列の作成
-	// ホスト名にポート番号が含まれている可能性があるため、tcp() の形式で指定するのが一般的です。
-	// 例: MYSQL_HOST="127.0.0.1:3306" の場合、そのまま使用できます。
-	// もしMYSQL_HOSTが "127.0.0.1" のみで、ポートが別に設定されている場合は `host:port` の形式に調整してください。
+	// TLSを使用する場合は `tls=custom` を追加します。
+	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&tls=custom",
+		mysqlUser,
+		mysqlPwd,
+		mysqlHost,
+		mysqlDatabase,
+	)
+
 	var err error
-	db, err = sql.Open("mysql", connStr)
+	db, err = sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("データベース接続エラー: %v", err)
 	}
-	defer db.Close()
 
 	// データベースへのPINGで接続確認
 	err = db.Ping()
@@ -110,128 +98,140 @@ func main() {
 		log.Fatalf("データベースPINGエラー: %v", err)
 	}
 	fmt.Println("MySQLデータベースに正常に接続しました！")
-	// --- データベース接続部分の変更ここまで ---
-
-	// ルーターの設定 (変更なし)
-	router := mux.NewRouter()
-
-	// CORSミドルウェア (変更なし)
-	router.Use(corsMiddleware)
-
-	// APIエンドポイントの定義 (変更なし)
-	router.HandleFunc("/api/users", createUser).Methods("GET")
-	router.HandleFunc("/api/posts", createPost).Methods("POST")
-	router.HandleFunc("/api/replies", createReply).Methods("POST")
-	router.HandleFunc("/api/likes", createLike).Methods("POST")
-	//port := os.Getenv("PORT"); if port == "" { port = "8080" }
-	fmt.Println("サーバーをポート8080で起動中...")
-	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
-// CORSミドルウェア (変更なし)
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000") // Reactのポート
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+// getPostsHandler retrieves all posts with their like counts and replies.
+func getPostsHandler(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.Query(`
+	SELECT p.id, p.user_id, p.content, p.created_at,
+	(SELECT COUNT(*) FROM likes WHERE post_id = p.id) AS like_count
+	FROM posts p ORDER BY p.created_at DESC`)
+	if err != nil {
+		http.Error(w, "データ取得失敗: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
 
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
+	var posts []Post
+	for rows.Next() {
+		var post Post
+		if err := rows.Scan(&post.ID, &post.UserID, &post.Content, &post.CreatedAt, &post.Likes); err != nil {
+			http.Error(w, "データスキャン失敗: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		next.ServeHTTP(w, r)
-	})
-}
 
-// APIハンドラ関数群 (変更なし)
-func createUser(w http.ResponseWriter, r *http.Request) {
-	var user User
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		replyRows, err := db.Query("SELECT id, post_id, user_id, content, created_at FROM replies WHERE post_id = ?", post.ID)
+		if err != nil {
+			http.Error(w, "リプライ取得失敗: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// replyRowsはループごとにdeferされるため、正常にクローズされます。
+		// ただし、大量の投稿がある場合にパフォーマンスに影響が出る可能性があります。
+		// 全ての返信を一つのクエリで取得し、アプリケーション側で関連付ける方が効率的な場合があります。
+		for replyRows.Next() {
+			var reply Reply
+			if err := replyRows.Scan(&reply.ID, &reply.PostID, &reply.UserID, &reply.Content, &reply.CreatedAt); err == nil {
+				post.Replies = append(post.Replies, reply)
+			}
+		}
+		replyRows.Close() // ここで明示的にクローズ
+
+		posts = append(posts, post)
 	}
-	result, err := db.Exec("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-		user.Username, user.Email, user.PasswordHash)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	id, _ := result.LastInsertId()
-	user.ID = int(id)
-	user.CreatedAt = time.Now()
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
-	fmt.Printf("ユーザーを作成しました: %s\n", user.Username)
+	if err := json.NewEncoder(w).Encode(posts); err != nil {
+		log.Printf("JSONエンコード失敗: %v", err)
+		http.Error(w, "レスポンスの生成失敗", http.StatusInternalServerError)
+	}
 }
 
-func createPost(w http.ResponseWriter, r *http.Request) {
-	var post Post
-	err := json.NewDecoder(r.Body).Decode(&post)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+// createPostHandler creates a new post.
+func createPostHandler(w http.ResponseWriter, r *http.Request) {
+	type Req struct {
+		UserID  int    `json:"user_id"`
+		Content string `json:"content"`
+	}
+	var req Req
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "無効な入力: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	result, err := db.Exec("INSERT INTO posts (user_id, content) VALUES (?, ?)",
-		post.UserID, post.Content)
+	_, err := db.Exec("INSERT INTO posts (user_id, content) VALUES (?, ?)", req.UserID, req.Content)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "投稿作成失敗: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	id, _ := result.LastInsertId()
-	post.ID = int(id)
-	post.CreatedAt = time.Now()
-	post.UpdatedAt = time.Now()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(post)
-	fmt.Printf("投稿を作成しました (UserID: %d): %s\n", post.UserID, post.Content)
+	w.WriteHeader(http.StatusCreated)
+	fmt.Printf("投稿を作成しました (UserID: %d): %s\n", req.UserID, req.Content)
 }
 
-func createReply(w http.ResponseWriter, r *http.Request) {
-	var reply Reply
-	err := json.NewDecoder(r.Body).Decode(&reply)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+// likePostHandler handles liking a post.
+func likePostHandler(w http.ResponseWriter, r *http.Request) {
+	type Req struct {
+		UserID int `json:"user_id"`
+		PostID int `json:"post_id"`
+	}
+	var req Req
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "無効な入力: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	result, err := db.Exec("INSERT INTO replies (post_id, user_id, content) VALUES (?, ?, ?)",
-		reply.PostID, reply.UserID, reply.Content)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	id, _ := result.LastInsertId()
-	reply.ID = int(id)
-	reply.CreatedAt = time.Now()
-	reply.UpdatedAt = time.Now()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(reply)
-	fmt.Printf("返信を作成しました (PostID: %d, UserID: %d): %s\n", reply.PostID, reply.UserID, reply.Content)
-}
-
-func createLike(w http.ResponseWriter, r *http.Request) {
-	var like Like
-	err := json.NewDecoder(r.Body).Decode(&like)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	result, err := db.Exec("INSERT INTO likes (post_id, user_id) VALUES (?, ?)",
-		like.PostID, like.UserID)
+	_, err := db.Exec("INSERT IGNORE INTO likes (user_id, post_id) VALUES (?, ?)", req.UserID, req.PostID)
 	if err != nil {
 		mysqlErr, ok := err.(*mysql.MySQLError)
-		if ok && mysqlErr.Number == 1062 {
+		if ok && mysqlErr.Number == 1062 { // Duplicate entry error code for MySQL
 			http.Error(w, "既にこの投稿に「いいね」しています。", http.StatusConflict)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "いいね失敗: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	id, _ := result.LastInsertId()
-	like.ID = int(id)
-	like.CreatedAt = time.Now()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(like)
-	fmt.Printf("「いいね」を作成しました (PostID: %d, UserID: %d)\n", like.PostID, like.UserID)
+	w.WriteHeader(http.StatusCreated)
+	fmt.Printf("「いいね」を作成しました (PostID: %d, UserID: %d)\n", req.PostID, req.UserID)
+}
+
+// replyPostHandler handles replying to a post.
+func replyPostHandler(w http.ResponseWriter, r *http.Request) {
+	type Req struct {
+		UserID  int    `json:"user_id"`
+		PostID  int    `json:"post_id"`
+		Content string `json:"content"`
+	}
+	var req Req
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "無効な入力: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	_, err := db.Exec("INSERT INTO replies (user_id, post_id, content) VALUES (?, ?, ?)", req.UserID, req.PostID, req.Content)
+	if err != nil {
+		http.Error(w, "リプライ送信失敗: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	fmt.Printf("返信を作成しました (PostID: %d, UserID: %d): %s\n", req.PostID, req.UserID, req.Content)
+}
+
+func main() {
+	initDB()
+	defer db.Close() // main関数終了時にデータベース接続をクローズ
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/posts", getPostsHandler)
+	mux.HandleFunc("/posts/create", createPostHandler)
+	mux.HandleFunc("/posts/like", likePostHandler)
+	mux.HandleFunc("/posts/reply", replyPostHandler)
+
+	// CORSミドルウェアの設定
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:3000"}, // Reactのポート
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+		Debug:            true, // デバッグログを有効にする
+	})
+
+	handler := c.Handler(mux)
+	fmt.Println("サーバー起動中 :8080")
+	log.Fatal(http.ListenAndServe(":8080", handler))
 }
