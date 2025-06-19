@@ -12,6 +12,7 @@ function App() {
   const [posts, setPosts] = useState([]);
   const [newPostContent, setNewPostContent] = useState('');
   const [replyContent, setReplyContent] = useState({});
+  const API_URL = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(fireAuth, (currentUser) => {
@@ -22,7 +23,7 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      fetch('http://localhost:8080/posts')
+      fetch('${API_URL}/posts')
         .then((res) => res.json())
         .then((data) => setPosts(data))
         .catch((err) => console.error('投稿取得失敗', err));
