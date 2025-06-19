@@ -1,3 +1,5 @@
+App.js
+
 import React, { useEffect, useState } from 'react';
 import './App.css';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -159,3 +161,4 @@ function App() {
 }
 
 export default App;
+
