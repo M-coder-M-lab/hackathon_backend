@@ -99,13 +99,13 @@ func main() {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// すべてのオリジンを許可する（開発向け、本番環境では非推奨）
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
 		// "*" を使用する場合、Access-Control-Allow-Credentials: "true" は使用できません
 		// w.Header().Set("Access-Control-Allow-Credentials", "true") // この行は削除またはコメントアウトしてください
 
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		// Preflightリクエストへの即時レスポンス
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
