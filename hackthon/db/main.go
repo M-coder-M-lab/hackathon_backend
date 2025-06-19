@@ -18,7 +18,6 @@ import (
 
 var db *sql.DB
 
-// --- Structs ---
 type User struct {
 	ID        int       `json:"id"`
 	UID       string    `json:"uid"`
@@ -86,6 +85,15 @@ func main() {
 	router := mux.NewRouter()
 	router.Use(corsMiddleware)
 
+	// OPTIONS リクエストにも対応
+	router.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// ルート登録
 	router.HandleFunc("/api/login", loginHandler).Methods("POST")
 	router.HandleFunc("/api/posts", getPosts).Methods("GET")
 	router.HandleFunc("/api/posts", createPost).Methods("POST")
@@ -94,32 +102,20 @@ func main() {
 
 	log.Println("サーバー起動中 :8080")
 	http.ListenAndServe(":8080", router)
-	router.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-	w.WriteHeader(http.StatusOK)
-})
 }
 
-//func corsMiddleware(next http.Handler) http.Handler {
-	//return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// すべてのオリジンを許可する（開発向け、本番環境では非推奨）
-		//w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
-		// "*" を使用する場合、Access-Control-Allow-Credentials: "true" は使用できません
-		// w.Header().Set("Access-Control-Allow-Credentials", "true") // この行は削除またはコメントアウトしてください
-
-		//w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-		//w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		// Preflightリクエストへの即時レスポンス
-		//if r.Method == "OPTIONS" {
-			//w.WriteHeader(http.StatusOK)
-			//return
-		//}
-
-		//next.ServeHTTP(w, r)
-	//})
-//}
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
@@ -212,10 +208,7 @@ func summarizeReplies(w http.ResponseWriter, r *http.Request) {
 }
 
 func callGeminiAPI(text string) string {
-	// Gemini APIのエンドポイントとAPIキーを設定
-	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + "AIzaSyDYJCxH5qH2glxiiVlW6rzrcZE8ixeyPBI"
-
-	// リクエストのペイロードを JSON で作成
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDYJCxH5qH2glxiiVlW6rzrcZE8ixeyPBI"
 	payload := []byte(fmt.Sprintf(`{
 		"contents": [{
 			"parts": [{"text": "次のリプライ群を要約してください:\n%s"}]
@@ -238,7 +231,6 @@ func callGeminiAPI(text string) string {
 	defer resp.Body.Close()
 
 	body, _ := ioutil.ReadAll(resp.Body)
-	// JSONからレスポンスを抽出（簡易的）
 	var result struct {
 		Candidates []struct {
 			Content struct {
@@ -256,10 +248,3 @@ func callGeminiAPI(text string) string {
 	return "要約結果なし"
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-
-}
