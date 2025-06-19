@@ -87,7 +87,7 @@ func main() {
 
 	// OPTIONS リクエストにも対応
 	router.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
+		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-8jfgup12f-yuukis-projects-c4830709.vercel.app/")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.WriteHeader(http.StatusOK)
@@ -106,7 +106,7 @@ func main() {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-krnt.vercel.app")
+		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-8jfgup12f-yuukis-projects-c4830709.vercel.app/")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == "OPTIONS" {
