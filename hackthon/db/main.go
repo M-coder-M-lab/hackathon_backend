@@ -100,7 +100,6 @@ func main() {
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.WriteHeader(http.StatusOK)
 })
-	router.HandleFunc("/api/login", loginHandler).Methods("POST")
 }
 
 //func corsMiddleware(next http.Handler) http.Handler {
