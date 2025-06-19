@@ -16,7 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-const API_URL = 'https://hackthon-467321075767.europe-west1.run.app/api';
+const API_URL = process.env.REACT_APP_API_URL;
 
 function App() {
   const [user, setUser] = useState(null);
