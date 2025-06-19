@@ -267,29 +267,63 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 // 	json.NewEncoder(w).Encode(post)
 // }
 
+// func createPost(w http.ResponseWriter, r *http.Request) {
+// 	var post Post
+// 	if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
+// 		http.Error(w, "JSON解析エラー", http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	now := time.Now()
+// 	res, err := db.Exec("INSERT INTO posts (user_id, content, likes, created_at, updated_at) VALUES (?, ?, 0, ?, ?)",
+// 		post.UserID, post.Content, now, now)
+// 	if err != nil {
+// 		log.Printf("投稿作成失敗: %v", err)
+// 		http.Error(w, "投稿作成失敗", http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	postID, _ := res.LastInsertId()
+// 	post.ID = int(postID)
+// 	post.CreatedAt = now
+// 	post.UpdatedAt = now
+// 	post.Likes = 0
+
+// 	w.WriteHeader(http.StatusOK)
+// 	json.NewEncoder(w).Encode(post)
+// }
 func createPost(w http.ResponseWriter, r *http.Request) {
-	var post Post
-	if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
-		http.Error(w, "JSON解析エラー", http.StatusBadRequest)
+	var payload struct {
+		UID     string `json:"uid"`     // ← uid を受け取る
+		Content string `json:"content"` // ← 投稿内容
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "不正なリクエスト", http.StatusBadRequest)
 		return
 	}
 
-	now := time.Now()
-	res, err := db.Exec("INSERT INTO posts (user_id, content, likes, created_at, updated_at) VALUES (?, ?, 0, ?, ?)",
-		post.UserID, post.Content, now, now)
+	var userID int
+	err := db.QueryRow("SELECT id FROM users WHERE uid = ?", payload.UID).Scan(&userID)
 	if err != nil {
-		log.Printf("投稿作成失敗: %v", err)
-		http.Error(w, "投稿作成失敗", http.StatusInternalServerError)
+		http.Error(w, "ユーザーID取得エラー", http.StatusInternalServerError)
 		return
 	}
 
-	postID, _ := res.LastInsertId()
-	post.ID = int(postID)
-	post.CreatedAt = now
-	post.UpdatedAt = now
-	post.Likes = 0
-
-	w.WriteHeader(http.StatusOK)
+	res, err := db.Exec("INSERT INTO posts (user_id, content) VALUES (?, ?)", userID, payload.Content)
+	if err != nil {
+		http.Error(w, "投稿作成エラー", http.StatusInternalServerError)
+		return
+	}
+	id64, _ := res.LastInsertId()
+	post := Post{
+		ID:        int(id64),
+		UserID:    userID,
+		Content:   payload.Content,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Likes:     0,
+		Replies:   []Reply{},
+	}
 	json.NewEncoder(w).Encode(post)
 }
 
@@ -307,30 +341,66 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 // 	reply.UpdatedAt = time.Now()
 // 	json.NewEncoder(w).Encode(reply)
 // }
+// func createReply(w http.ResponseWriter, r *http.Request) {
+// 	var reply Reply
+// 	if err := json.NewDecoder(r.Body).Decode(&reply); err != nil {
+// 		http.Error(w, "JSON解析エラー", http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	now := time.Now()
+// 	res, err := db.Exec(`INSERT INTO replies (post_id, user_id, content, created_at, updated_at)
+// 		VALUES (?, ?, ?, ?, ?)`, reply.PostID, reply.UserID, reply.Content, now, now)
+// 	if err != nil {
+// 		log.Printf("リプライ作成失敗: %v", err)
+// 		http.Error(w, "リプライ作成エラー", http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	replyID, _ := res.LastInsertId()
+// 	reply.ID = int(replyID)
+// 	reply.CreatedAt = now
+// 	reply.UpdatedAt = now
+
+// 	w.WriteHeader(http.StatusOK)
+// 	json.NewEncoder(w).Encode(reply)
+// }
 func createReply(w http.ResponseWriter, r *http.Request) {
-	var reply Reply
-	if err := json.NewDecoder(r.Body).Decode(&reply); err != nil {
-		http.Error(w, "JSON解析エラー", http.StatusBadRequest)
+	var payload struct {
+		UID     string `json:"uid"`
+		PostID  int    `json:"post_id"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "不正なリクエスト", http.StatusBadRequest)
 		return
 	}
 
-	now := time.Now()
-	res, err := db.Exec(`INSERT INTO replies (post_id, user_id, content, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)`, reply.PostID, reply.UserID, reply.Content, now, now)
+	var userID int
+	err := db.QueryRow("SELECT id FROM users WHERE uid = ?", payload.UID).Scan(&userID)
 	if err != nil {
-		log.Printf("リプライ作成失敗: %v", err)
+		http.Error(w, "ユーザーID取得エラー", http.StatusInternalServerError)
+		return
+	}
+
+	res, err := db.Exec("INSERT INTO replies (post_id, user_id, content) VALUES (?, ?, ?)",
+		payload.PostID, userID, payload.Content)
+	if err != nil {
 		http.Error(w, "リプライ作成エラー", http.StatusInternalServerError)
 		return
 	}
-
-	replyID, _ := res.LastInsertId()
-	reply.ID = int(replyID)
-	reply.CreatedAt = now
-	reply.UpdatedAt = now
-
-	w.WriteHeader(http.StatusOK)
+	id64, _ := res.LastInsertId()
+	reply := Reply{
+		ID:        int(id64),
+		PostID:    payload.PostID,
+		UserID:    userID,
+		Content:   payload.Content,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
 	json.NewEncoder(w).Encode(reply)
 }
+
 
 
 func summarizeReplies(w http.ResponseWriter, r *http.Request) {
