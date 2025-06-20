@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os" 
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -72,7 +73,16 @@ func registerTLSConfig() {
 
 func main() {
 	registerTLSConfig()
-	connStr := fmt.Sprintf("uttc:19b-apFqu4APTx4A@tcp(34.67.141.68:3306)/hackathon?tls=custom&parseTime=true")
+
+	// 環境変数から取得
+	user := os.Getenv("MYSQL_USER")
+	password := os.Getenv("MYSQL_PWD")
+	host := os.Getenv("MYSQL_HOST")
+	database := os.Getenv("MYSQL_DATABASE")
+	
+	// connStr := fmt.Sprintf("uttc:19b-apFqu4APTx4A@tcp(34.67.141.68:3306)/hackathon?tls=custom&parseTime=true")
+	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?tls=custom&parseTime=true", user, password, host, database)
+	
 	var err error
 	db, err = sql.Open("mysql", connStr)
 	if err != nil {
