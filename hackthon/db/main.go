@@ -101,6 +101,7 @@ func main() {
 	router.HandleFunc("/api/posts", createPost).Methods("POST")
 	router.HandleFunc("/api/replies", createReply).Methods("POST")
 	router.HandleFunc("/api/summary/{postId}", summarizeReplies).Methods("GET")
+	router.HandleFunc("/api/likes", createLike).Methods("POST")
 
 	log.Println("サーバー起動中 :8080")
 	http.ListenAndServe(":8080", router)
@@ -119,27 +120,32 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// func loginHandler(w http.ResponseWriter, r *http.Request) {
-// 	var payload struct {
-// 		UID      string `json:"uid"`
-// 		Email    string `json:"email"`
-// 		Username string `json:"username"`
-// 	}
-// 	json.NewDecoder(r.Body).Decode(&payload)
-// 	var id int
-// 	err := db.QueryRow("SELECT id FROM users WHERE uid = ?", payload.UID).Scan(&id)
-// 	if err == sql.ErrNoRows {
-// 		res, err := db.Exec("INSERT INTO users (uid, email, username) VALUES (?, ?, ?)", payload.UID, payload.Email, payload.Username)
-// 		if err != nil {
-// 			http.Error(w, "ユーザー作成エラー", http.StatusInternalServerError)
-// 			return
-// 		}
-// 		id64, _ := res.LastInsertId()
-// 		id = int(id64)
-// 	}
-// 	w.WriteHeader(http.StatusOK)
-// 	json.NewEncoder(w).Encode(map[string]int{"user_id": id})
-// }
+func createLike(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		UID    string `json:"uid"`
+		PostID int    `json:"post_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "不正なリクエスト", http.StatusBadRequest)
+		return
+	}
+
+	var userID int
+	err := db.QueryRow("SELECT id FROM users WHERE uid = ?", payload.UID).Scan(&userID)
+	if err != nil {
+		http.Error(w, "ユーザーID取得エラー", http.StatusInternalServerError)
+		return
+	}
+
+	_, err = db.Exec("INSERT IGNORE INTO likes (user_id, post_id) VALUES (?, ?)", userID, payload.PostID)
+	if err != nil {
+		http.Error(w, "いいね作成エラー", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "いいね登録完了"})
+}
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
