@@ -80,7 +80,6 @@ func main() {
 	host := os.Getenv("MYSQL_HOST")
 	database := os.Getenv("MYSQL_DATABASE")
 	
-	// connStr := fmt.Sprintf("uttc:19b-apFqu4APTx4A@tcp(34.67.141.68:3306)/hackathon?tls=custom&parseTime=true")
 	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?tls=custom&parseTime=true", user, password, host, database)
 	
 	var err error
@@ -333,7 +332,7 @@ func summarizeReplies(w http.ResponseWriter, r *http.Request) {
 
 func callGeminiAPI(text string) string {
 	apiKey := os.Getenv("API_KEY")
-	//url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDYJCxH5qH2glxiiVlW6rzrcZE8ixeyPBI"
+	
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=%s", apiKey)
 	
 	payload := []byte(fmt.Sprintf(`{
