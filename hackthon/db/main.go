@@ -79,6 +79,7 @@ func main() {
 	password := os.Getenv("MYSQL_PWD")
 	host := os.Getenv("MYSQL_HOST")
 	database := os.Getenv("MYSQL_DATABASE")
+	appURL := os.Getenv("APP_URL")
 	
 	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?tls=custom&parseTime=true", user, password, host, database)
 	
@@ -94,11 +95,11 @@ func main() {
 	fmt.Println("MySQLに接続成功")
 
 	router := mux.NewRouter()
-	router.Use(corsMiddleware)
+	router.Use(corsMiddleware(appURL))
 
 	// OPTIONS リクエストにも対応
 	router.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-o9kp.vercel.app")
+		w.Header().Set("Access-Control-Allow-Origin", appURL)
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.WriteHeader(http.StatusOK)
@@ -118,7 +119,7 @@ func main() {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "https://hackthon-o9kp.vercel.app")
+		w.Header().Set("Access-Control-Allow-Origin", appURL
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == "OPTIONS" {
