@@ -72,7 +72,7 @@ func registerTLSConfig() {
 
 func main() {
 	registerTLSConfig()
-	connStr := fmt.Sprintf("uttc:19b-apFqu4APTx4A@tcp(34.67.141.68:3306)/hackathon?tls=custom")
+	connStr := fmt.Sprintf("uttc:19b-apFqu4APTx4A@tcp(34.67.141.68:3306)/hackathon?tls=custom&parseTime=true")
 	var err error
 	db, err = sql.Open("mysql", connStr)
 	if err != nil {
