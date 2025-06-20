@@ -417,7 +417,7 @@ func summarizeReplies(w http.ResponseWriter, r *http.Request) {
 }
 
 func callGeminiAPI(text string) string {
-	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDYJCxH5qH2glxiiVlW6rzrcZE8ixeyPBI"
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDYJCxH5qH2glxiiVlW6rzrcZE8ixeyPBI"
 	payload := []byte(fmt.Sprintf(`{
 		"contents": [{
 			"parts": [{"text": "次のリプライ群を要約してください:\n%s"}]
