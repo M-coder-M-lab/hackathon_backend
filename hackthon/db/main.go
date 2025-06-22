@@ -24,7 +24,7 @@ type User struct {
 	UID          string    `json:"uid"`
 	Username     string    `json:"username"`
 	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"` // Firebase使ってるなら使わない想定
+	ProfileImageURL string    `json:"profile_image_url"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
@@ -112,6 +112,9 @@ func main() {
 	router.HandleFunc("/api/replies", createReply).Methods("POST")
 	router.HandleFunc("/api/summary/{postId}", summarizeReplies).Methods("GET")
 	router.HandleFunc("/api/likes", createLike).Methods("POST")
+	router.HandleFunc("/api/profile", updateProfile).Methods("POST")
+	router.HandleFunc("/api/profile", getProfile).Methods("GET")
+
 
 	log.Println("サーバー起動中 :8080")
 	http.ListenAndServe(":8080", router)
@@ -130,6 +133,39 @@ func corsMiddleware(appURL string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func updateProfile(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		UID     string `json:"uid"`
+		Name    string `json:"name"`
+		ImageURL string `json:"image_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "無効なリクエスト", http.StatusBadRequest)
+		return
+	}
+
+	_, err := db.Exec("UPDATE users SET username = ?, profile_image_url = ? WHERE uid = ?", payload.Name, payload.ImageURL, payload.UID)
+	if err != nil {
+		http.Error(w, "プロフィール更新失敗", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "プロフィール更新成功"})
+}
+
+func getProfile(w http.ResponseWriter, r *http.Request) {
+	uid := r.URL.Query().Get("uid")
+	var u User
+	err := db.QueryRow("SELECT id, uid, username, email, profile_image_url, created_at FROM users WHERE uid = ?", uid).
+		Scan(&u.ID, &u.UID, &u.Username, &u.Email, &u.ProfileImageURL, &u.CreatedAt)
+	if err != nil {
+		http.Error(w, "プロフィール取得失敗", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(u)
 }
 
 
