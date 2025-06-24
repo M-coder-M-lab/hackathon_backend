@@ -21,32 +21,32 @@ import (
 var db *sql.DB
 
 type User struct {
-	ID           int       json:"id"
-	UID          string    json:"uid"
-	Username     string    json:"username"
-	Email        string    json:"email"
-	PasswordHash string    json:"-" // Firebase使ってるなら使わない想定
-	CreatedAt    time.Time json:"created_at"
+	ID           int       ``json:"id"`
+	UID          string    `json:"uid"`
+	Username     string    `json:"username"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"-"` // Firebase使ってるなら使わない想定
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 
 type Post struct {
-	ID        int       json:"id"
-	UserID    int       json:"user_id"
-	Content   string    json:"content"
-	Likes     int       json:"likes"
-	Replies   []Reply   json:"replies"
-	CreatedAt time.Time json:"created_at"
-	UpdatedAt time.Time json:"updated_at"
+	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
+	Content   string    `json:"content"`
+	Likes     int       `json:"likes"`
+	Replies   []Reply   `json:"replies"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Reply struct {
-	ID        int       json:"id"
-	PostID    int       json:"post_id"
-	UserID    int       json:"user_id"
-	Content   string    json:"content"
-	CreatedAt time.Time json:"created_at"
-	UpdatedAt time.Time json:"updated_at"
+	ID        int       `json:"id"`
+	PostID    int       `json:"post_id"`
+	UserID    int       `json:"user_id"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func registerTLSConfig() {
