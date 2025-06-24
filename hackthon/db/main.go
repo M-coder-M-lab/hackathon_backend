@@ -20,32 +20,32 @@ import (
 var db *sql.DB
 
 type User struct {
-	ID           int       `json:"id"`
-	UID          string    `json:"uid"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	ProfileImageURL string    `json:"profile_image_url"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           int       json:"id"
+	UID          string    json:"uid"
+	Username     string    json:"username"
+	Email        string    json:"email"
+	PasswordHash string    json:"-" // Firebase使ってるなら使わない想定
+	CreatedAt    time.Time json:"created_at"
 }
 
 
 type Post struct {
-	ID        int       `json:"id"`
-	UserID    int       `json:"user_id"`
-	Content   string    `json:"content"`
-	Likes     int       `json:"likes"`
-	Replies   []Reply   `json:"replies"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        int       json:"id"
+	UserID    int       json:"user_id"
+	Content   string    json:"content"
+	Likes     int       json:"likes"
+	Replies   []Reply   json:"replies"
+	CreatedAt time.Time json:"created_at"
+	UpdatedAt time.Time json:"updated_at"
 }
 
 type Reply struct {
-	ID        int       `json:"id"`
-	PostID    int       `json:"post_id"`
-	UserID    int       `json:"user_id"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        int       json:"id"
+	PostID    int       json:"post_id"
+	UserID    int       json:"user_id"
+	Content   string    json:"content"
+	CreatedAt time.Time json:"created_at"
+	UpdatedAt time.Time json:"updated_at"
 }
 
 func registerTLSConfig() {
@@ -112,9 +112,6 @@ func main() {
 	router.HandleFunc("/api/replies", createReply).Methods("POST")
 	router.HandleFunc("/api/summary/{postId}", summarizeReplies).Methods("GET")
 	router.HandleFunc("/api/likes", createLike).Methods("POST")
-	router.HandleFunc("/api/profile", updateProfile).Methods("POST")
-	router.HandleFunc("/api/profile", getProfile).Methods("GET")
-
 
 	log.Println("サーバー起動中 :8080")
 	http.ListenAndServe(":8080", router)
@@ -135,44 +132,11 @@ func corsMiddleware(appURL string) func(http.Handler) http.Handler {
 	}
 }
 
-func updateProfile(w http.ResponseWriter, r *http.Request) {
-	var payload struct {
-		UID     string `json:"uid"`
-		Name    string `json:"name"`
-		ImageURL string `json:"image_url"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, "無効なリクエスト", http.StatusBadRequest)
-		return
-	}
-
-	_, err := db.Exec("UPDATE users SET username = ?, profile_image_url = ? WHERE uid = ?", payload.Name, payload.ImageURL, payload.UID)
-	if err != nil {
-		http.Error(w, "プロフィール更新失敗", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "プロフィール更新成功"})
-}
-
-func getProfile(w http.ResponseWriter, r *http.Request) {
-	uid := r.URL.Query().Get("uid")
-	var u User
-	err := db.QueryRow("SELECT id, uid, username, email, profile_image_url, created_at FROM users WHERE uid = ?", uid).
-		Scan(&u.ID, &u.UID, &u.Username, &u.Email, &u.ProfileImageURL, &u.CreatedAt)
-	if err != nil {
-		http.Error(w, "プロフィール取得失敗", http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(u)
-}
-
 
 func createLike(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		UID    string `json:"uid"`
-		PostID int    `json:"post_id"`
+		UID    string json:"uid"
+		PostID int    json:"post_id"
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "不正なリクエスト", http.StatusBadRequest)
@@ -198,9 +162,9 @@ func createLike(w http.ResponseWriter, r *http.Request) {
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		UID      string `json:"uid"`
-		Email    string `json:"email"`
-		Username string `json:"username"`
+		UID      string json:"uid"
+		Email    string json:"email"
+		Username string json:"username"
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -212,7 +176,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var id int
 	err := db.QueryRow("SELECT id FROM users WHERE uid = ?", payload.UID).Scan(&id)
 	if err == sql.ErrNoRows {
-		res, err := db.Exec(`INSERT INTO users (uid, username, email, created_at) VALUES (?, ?, ?, ?)`,
+		res, err := db.Exec(INSERT INTO users (uid, username, email, created_at) VALUES (?, ?, ?, ?),
 			payload.UID, payload.Username, payload.Email, time.Now())
 		if err != nil {
 			log.Printf("ユーザーINSERT失敗: %v", err)
@@ -285,8 +249,8 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 
 func createPost(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		UID     string `json:"uid"`     // ← uid を受け取る
-		Content string `json:"content"` // ← 投稿内容
+		UID     string json:"uid"     // ← uid を受け取る
+		Content string json:"content" // ← 投稿内容
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "不正なリクエスト", http.StatusBadRequest)
@@ -321,9 +285,9 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 
 func createReply(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		UID     string `json:"uid"`
-		PostID  int    `json:"post_id"`
-		Content string `json:"content"`
+		UID     string json:"uid"
+		PostID  int    json:"post_id"
+		Content string json:"content"
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "不正なリクエスト", http.StatusBadRequest)
@@ -375,11 +339,11 @@ func callGeminiAPI(text string) string {
 	
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=%s", apiKey)
 	
-	payload := []byte(fmt.Sprintf(`{
+	payload := []byte(fmt.Sprintf({
 		"contents": [{
 			"parts": [{"text": "次のリプライ群を要約してください:\n%s"}]
 		}]
-	}`, text))
+	}, text))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	if err != nil {
@@ -401,10 +365,10 @@ func callGeminiAPI(text string) string {
 		Candidates []struct {
 			Content struct {
 				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"content"`
-		} `json:"candidates"`
+					Text string json:"text"
+				} json:"parts"
+			} json:"content"
+		} json:"candidates"
 	}
 	json.Unmarshal(body, &result)
 
