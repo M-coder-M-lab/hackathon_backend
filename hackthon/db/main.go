@@ -1,4 +1,4 @@
-package mainMore actions
+package main
 
 import (
 	"bytes"
