@@ -1,5 +1,4 @@
-package main
-
+package mainMore actions
 
 import (
 	"bytes"
@@ -21,7 +20,7 @@ import (
 var db *sql.DB
 
 type User struct {
-	ID           int       ``json:"id"`
+	ID           int       `json:"id"`
 	UID          string    `json:"uid"`
 	Username     string    `json:"username"`
 	Email        string    `json:"email"`
@@ -81,9 +80,9 @@ func main() {
 	host := os.Getenv("MYSQL_HOST")
 	database := os.Getenv("MYSQL_DATABASE")
 	appURL := os.Getenv("APP_URL")
-	
+
 	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?tls=custom&parseTime=true", user, password, host, database)
-	
+
 	var err error
 	db, err = sql.Open("mysql", connStr)
 	if err != nil {
@@ -136,8 +135,8 @@ func corsMiddleware(appURL string) func(http.Handler) http.Handler {
 
 func createLike(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		UID    string json:"uid"
-		PostID int    json:"post_id"
+		UID    string `json:"uid"`
+		PostID int    `json:"post_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "不正なリクエスト", http.StatusBadRequest)
@@ -163,9 +162,9 @@ func createLike(w http.ResponseWriter, r *http.Request) {
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		UID      string json:"uid"
-		Email    string json:"email"
-		Username string json:"username"
+		UID      string `json:"uid"`
+		Email    string `json:"email"`
+		Username string `json:"username"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -177,7 +176,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var id int
 	err := db.QueryRow("SELECT id FROM users WHERE uid = ?", payload.UID).Scan(&id)
 	if err == sql.ErrNoRows {
-		res, err := db.Exec(INSERT INTO users (uid, username, email, created_at) VALUES (?, ?, ?, ?),
+		res, err := db.Exec(`INSERT INTO users (uid, username, email, created_at) VALUES (?, ?, ?, ?)`,
 			payload.UID, payload.Username, payload.Email, time.Now())
 		if err != nil {
 			log.Printf("ユーザーINSERT失敗: %v", err)
@@ -250,8 +249,8 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 
 func createPost(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		UID     string json:"uid"     // ← uid を受け取る
-		Content string json:"content" // ← 投稿内容
+		UID     string `json:"uid"`     // ← uid を受け取る
+		Content string `json:"content"` // ← 投稿内容
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "不正なリクエスト", http.StatusBadRequest)
@@ -286,9 +285,9 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 
 func createReply(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		UID     string json:"uid"
-		PostID  int    json:"post_id"
-		Content string json:"content"
+		UID     string `json:"uid"`
+		PostID  int    `json:"post_id"`
+		Content string `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "不正なリクエスト", http.StatusBadRequest)
@@ -337,14 +336,14 @@ func summarizeReplies(w http.ResponseWriter, r *http.Request) {
 
 func callGeminiAPI(text string) string {
 	apiKey := os.Getenv("API_KEY")
-	
+
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=%s", apiKey)
-	
-	payload := []byte(fmt.Sprintf({
+
+	payload := []byte(fmt.Sprintf(`{
 		"contents": [{
 			"parts": [{"text": "次のリプライ群を要約してください:\n%s"}]
 		}]
-	}, text))
+	}`, text))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	if err != nil {
@@ -366,10 +365,10 @@ func callGeminiAPI(text string) string {
 		Candidates []struct {
 			Content struct {
 				Parts []struct {
-					Text string json:"text"
-				} json:"parts"
-			} json:"content"
-		} json:"candidates"
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
 	}
 	json.Unmarshal(body, &result)
 
@@ -378,4 +377,3 @@ func callGeminiAPI(text string) string {
 	}
 	return "要約結果なし"
 }
-
